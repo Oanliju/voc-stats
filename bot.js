@@ -113,7 +113,7 @@ function saveConfig() {
 // --- ÉVÉNEMENT READY --- //
 client.once('ready', async () => {
     console.log(`✅ Connecté en tant que ${client.user.tag}`);
-    client.user.setActivity('📊 /nae', { type: ActivityType.Watching });
+    client.user.setActivity('📊 /yuma', { type: ActivityType.Watching });
 
     try {
         await rest.put(Routes.applicationGuildCommands(client.user.id, guildId), { body: commands });
