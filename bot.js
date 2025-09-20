@@ -39,7 +39,7 @@ if (fs.existsSync(CONFIG_PATH)) {
 
 // Compteurs (sans les bots)
 const counters = [
-    { type: 'all', format: count => `🌺ゝMembres : ${count}` },
+    { type: 'all', format: count => `🍂ゝMembres : ${count}` },
     { type: 'online', format: count => `🌴ゝEn ligne: ${count}` },
     { type: 'voice', format: count => `🔊ゝEn vocal: ${count}` }
 ];
@@ -113,7 +113,7 @@ function saveConfig() {
 // --- ÉVÉNEMENT READY --- //
 client.once('ready', async () => {
     console.log(`✅ Connecté en tant que ${client.user.tag}`);
-    client.user.setActivity('📊 /yuma', { type: ActivityType.Watching });
+    client.user.setActivity('pourtoi', { type: ActivityType.Watching });
 
     try {
         await rest.put(Routes.applicationGuildCommands(client.user.id, guildId), { body: commands });
