@@ -6,8 +6,7 @@ const {
     REST, 
     ActivityType, 
     ChannelType, 
-    PermissionFlagsBits, 
-    MessageFlags 
+    PermissionFlagsBits 
 } = require('discord.js');
 const fs = require('fs');
 const http = require('http');
@@ -29,7 +28,6 @@ const guildId = process.env.GUILD_ID;
 const CONFIG_PATH = './config.json';
 let config = { categoryId: null, counters: {} };
 
-// Charger config.json si présent
 function loadConfig() {
     if (fs.existsSync(CONFIG_PATH)) {
         try {
@@ -42,14 +40,12 @@ function loadConfig() {
 }
 loadConfig();
 
-// Compteurs (sans les bots)
 const counters = [
     { type: 'all', format: count => `🍂ゝMembres : ${count}` },
     { type: 'online', format: count => `🍡ゝEn ligne: ${count}` },
     { type: 'voice', format: count => `👒ゝEn vocal: ${count}` }
 ];
 
-// Enregistrement des commandes
 const rest = new REST({ version: '10' }).setToken(token);
 const commands = [
     new SlashCommandBuilder()
@@ -65,9 +61,9 @@ const commands = [
         .setDescription('Met à jour les compteurs immédiatement et relance le timer')
 ].map(cmd => cmd.toJSON());
 
-// --- MISE À JOUR DES COMPTEURS --- //
+// --- FONCTIONS --- //
 async function updateCounters() {
-    loadConfig(); // recharge la config à chaque update
+    loadConfig();
     const guild = client.guilds.cache.first();
     if (!guild) return;
 
@@ -95,7 +91,6 @@ async function updateCounters() {
     console.log("🔁 Compteurs mis à jour :", stats);
 }
 
-// --- DÉTECTION AUTOMATIQUE --- //
 async function detectExistingCounters() {
     const guild = client.guilds.cache.first();
     if (!guild || !config.categoryId) return;
@@ -108,19 +103,15 @@ async function detectExistingCounters() {
         const found = channels.find(ch => 
             ch.type === ChannelType.GuildVoice && ch.name.startsWith(counter.format('').split(':')[0])
         );
-        if (found) {
-            config.counters[counter.type] = found.id;
-        }
+        if (found) config.counters[counter.type] = found.id;
     }
     saveConfig();
 }
 
-// --- SAUVEGARDE CONFIG --- //
 function saveConfig() {
     fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 4));
 }
 
-// --- TIMER GLOBAL --- //
 let updateInterval = null;
 function restartUpdateTimer() {
     if (updateInterval) clearInterval(updateInterval);
@@ -128,7 +119,7 @@ function restartUpdateTimer() {
     console.log("⏰ Nouveau timer lancé (5 minutes)");
 }
 
-// --- ÉVÉNEMENT READY --- //
+// --- READY --- //
 client.once('ready', async () => {
     console.log(`✅ Connecté en tant que ${client.user.tag}`);
     client.user.setActivity('pourtoi', { type: ActivityType.Watching });
@@ -145,54 +136,53 @@ client.once('ready', async () => {
     restartUpdateTimer();
 });
 
-// --- GESTIONNAIRE DE SLASH COMMANDS --- //
+// --- COMMANDES --- //
 client.on('interactionCreate', async interaction => {
     if (!interaction.isCommand()) return;
 
-    // --- Commande /setup --- //
-    if (interaction.commandName === 'setup') {
-        const category = interaction.options.getChannel('category');
-        if (category.type !== ChannelType.GuildCategory) {
-            return interaction.reply({ 
-                content: '❌ Veuillez sélectionner une catégorie valide.', 
-                flags: MessageFlags.Ephemeral 
-            });
+    try {
+        if (interaction.commandName === 'setup') {
+            const category = interaction.options.getChannel('category');
+            if (category.type !== ChannelType.GuildCategory) {
+                return interaction.reply({ content: '❌ Veuillez sélectionner une catégorie valide.', flags: 64 });
+            }
+
+            config.categoryId = category.id;
+            config.counters = {};
+
+            for (const counter of counters) {
+                const channel = await interaction.guild.channels.create({
+                    name: counter.format(0),
+                    type: ChannelType.GuildVoice,
+                    parent: category.id,
+                    permissionOverwrites: [
+                        { id: interaction.guild.id, deny: [PermissionFlagsBits.Connect] }
+                    ]
+                });
+                config.counters[counter.type] = channel.id;
+            }
+
+            saveConfig();
+            await interaction.reply({ content: '✅ Salons de compteur créés et sauvegardés.', flags: 64 });
+            await updateCounters();
+            restartUpdateTimer();
         }
 
-        config.categoryId = category.id;
-        config.counters = {};
-
-        for (const counter of counters) {
-            const channel = await interaction.guild.channels.create({
-                name: counter.format(0),
-                type: ChannelType.GuildVoice,
-                parent: category.id,
-                permissionOverwrites: [
-                    { id: interaction.guild.id, deny: [PermissionFlagsBits.Connect] }
-                ]
-            });
-            config.counters[counter.type] = channel.id;
+        if (interaction.commandName === 'update') {
+            await interaction.reply({ content: '🔄 Mise à jour en cours...', flags: 64 });
+            await updateCounters();
+            restartUpdateTimer();
+            await interaction.editReply('✅ Compteurs mis à jour et timer relancé.');
         }
-
-        saveConfig();
-        await interaction.reply({ 
-            content: '✅ Salons de compteur créés et sauvegardés.', 
-            flags: MessageFlags.Ephemeral 
-        });
-        await updateCounters();
-        restartUpdateTimer();
-    }
-
-    // --- Commande /update --- //
-    if (interaction.commandName === 'update') {
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-        await updateCounters();
-        restartUpdateTimer();
-        await interaction.editReply({ content: '🔄 Compteurs mis à jour et timer relancé.' });
+    } catch (err) {
+        console.error('❌ Erreur sur interaction :', err);
+        if (interaction.deferred || interaction.replied) {
+            await interaction.editReply('⚠️ Une erreur est survenue.');
+        } else {
+            await interaction.reply({ content: '⚠️ Une erreur est survenue.', flags: 64 });
+        }
     }
 });
-
-client.login(token);
 
 // --- SERVEUR HTTP POUR RENDER --- //
 const PORT = process.env.PORT || 3000;
@@ -202,3 +192,5 @@ http.createServer((req, res) => {
 }).listen(PORT, () => {
     console.log(`🌐 Serveur HTTP actif sur le port ${PORT}`);
 });
+
+client.login(token);
