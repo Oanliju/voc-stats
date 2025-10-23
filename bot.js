@@ -29,13 +29,17 @@ const CONFIG_PATH = './config.json';
 let config = { categoryId: null, counters: {} };
 
 // Charger config.json si présent
-if (fs.existsSync(CONFIG_PATH)) {
-    try {
-        config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
-    } catch (err) {
-        console.error("⚠️ Erreur de lecture de config.json, réinitialisation...");
+function loadConfig() {
+    if (fs.existsSync(CONFIG_PATH)) {
+        try {
+            config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
+            console.log("📁 Configuration rechargée :", config);
+        } catch (err) {
+            console.error("⚠️ Erreur de lecture de config.json :", err);
+        }
     }
 }
+loadConfig();
 
 // Compteurs (sans les bots)
 const counters = [
@@ -53,11 +57,16 @@ const commands = [
         .addChannelOption(option =>
             option.setName('category')
                 .setDescription('Catégorie où créer les salons')
-                .setRequired(true))
+                .setRequired(true)
+        ),
+    new SlashCommandBuilder()
+        .setName('update')
+        .setDescription('Met à jour les compteurs immédiatement et relance le timer')
 ].map(cmd => cmd.toJSON());
 
 // --- MISE À JOUR DES COMPTEURS --- //
 async function updateCounters() {
+    loadConfig(); // recharge la config à chaque update
     const guild = client.guilds.cache.first();
     if (!guild) return;
 
@@ -81,14 +90,14 @@ async function updateCounters() {
             await channel.setName(format(stats[type])).catch(console.error);
         }
     }
+
+    console.log("🔁 Compteurs mis à jour :", stats);
 }
 
 // --- DÉTECTION AUTOMATIQUE --- //
 async function detectExistingCounters() {
     const guild = client.guilds.cache.first();
-    if (!guild) return;
-
-    if (!config.categoryId) return; // Rien à détecter si pas de catégorie connue
+    if (!guild || !config.categoryId) return;
 
     const category = guild.channels.cache.get(config.categoryId);
     if (!category || category.type !== ChannelType.GuildCategory) return;
@@ -110,6 +119,14 @@ function saveConfig() {
     fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 4));
 }
 
+// --- TIMER GLOBAL --- //
+let updateInterval = null;
+function restartUpdateTimer() {
+    if (updateInterval) clearInterval(updateInterval);
+    updateInterval = setInterval(updateCounters, 5 * 60 * 1000);
+    console.log("⏰ Nouveau timer lancé (5 minutes)");
+}
+
 // --- ÉVÉNEMENT READY --- //
 client.once('ready', async () => {
     console.log(`✅ Connecté en tant que ${client.user.tag}`);
@@ -123,8 +140,8 @@ client.once('ready', async () => {
     }
 
     await detectExistingCounters();
-    updateCounters();
-    setInterval(updateCounters, 5 * 60 * 1000); // Mise à jour toutes les 5 min
+    await updateCounters();
+    restartUpdateTimer();
 });
 
 // --- GESTIONNAIRE DE SLASH COMMANDS --- //
@@ -154,13 +171,22 @@ client.on('interactionCreate', async interaction => {
 
         saveConfig();
         await interaction.reply({ content: '✅ Salons de compteur créés et sauvegardés.', ephemeral: true });
-        updateCounters();
+        await updateCounters();
+        restartUpdateTimer();
+    }
+
+    // --- Commande /update --- //
+    if (interaction.commandName === 'update') {
+        await interaction.deferReply({ ephemeral: true });
+        await updateCounters();
+        restartUpdateTimer();
+        await interaction.editReply('🔄 Compteurs mis à jour et timer relancé.');
     }
 });
 
 client.login(token);
 
-// --- SERVEUR HTTP POUR RENDER ---
+// --- SERVEUR HTTP POUR RENDER --- //
 const PORT = process.env.PORT || 3000;
 http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
