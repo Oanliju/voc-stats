@@ -180,7 +180,7 @@ client.on("interactionCreate", async interaction => {
 // --- READY EVENT ---
 client.once("ready", async () => {
     console.log(`✅ Connecté en tant que ${client.user.tag}`);
-    client.user.setActivity("les stats du serveur", {
+    client.user.setActivity("pourtoi", {
         type: ActivityType.Watching
     });
 
