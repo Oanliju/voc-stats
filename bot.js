@@ -40,8 +40,8 @@ if (fs.existsSync(CONFIG_PATH)) {
 // Compteurs (sans les bots)
 const counters = [
     { type: 'all', format: count => `🍂ゝMembres : ${count}` },
-    { type: 'online', format: count => `🌴ゝEn ligne: ${count}` },
-    { type: 'voice', format: count => `🔊ゝEn vocal: ${count}` }
+    { type: 'online', format: count => `🍡ゝEn ligne: ${count}` },
+    { type: 'voice', format: count => `👒ゝEn vocal: ${count}` }
 ];
 
 // Enregistrement des commandes
