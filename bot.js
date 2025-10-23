@@ -6,7 +6,8 @@ const {
     REST, 
     ActivityType, 
     ChannelType, 
-    PermissionFlagsBits 
+    PermissionFlagsBits, 
+    MessageFlags 
 } = require('discord.js');
 const fs = require('fs');
 const http = require('http');
@@ -148,10 +149,14 @@ client.once('ready', async () => {
 client.on('interactionCreate', async interaction => {
     if (!interaction.isCommand()) return;
 
+    // --- Commande /setup --- //
     if (interaction.commandName === 'setup') {
         const category = interaction.options.getChannel('category');
         if (category.type !== ChannelType.GuildCategory) {
-            return interaction.reply({ content: '❌ Veuillez sélectionner une catégorie valide.', ephemeral: true });
+            return interaction.reply({ 
+                content: '❌ Veuillez sélectionner une catégorie valide.', 
+                flags: MessageFlags.Ephemeral 
+            });
         }
 
         config.categoryId = category.id;
@@ -170,17 +175,20 @@ client.on('interactionCreate', async interaction => {
         }
 
         saveConfig();
-        await interaction.reply({ content: '✅ Salons de compteur créés et sauvegardés.', ephemeral: true });
+        await interaction.reply({ 
+            content: '✅ Salons de compteur créés et sauvegardés.', 
+            flags: MessageFlags.Ephemeral 
+        });
         await updateCounters();
         restartUpdateTimer();
     }
 
     // --- Commande /update --- //
     if (interaction.commandName === 'update') {
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
         await updateCounters();
         restartUpdateTimer();
-        await interaction.editReply('🔄 Compteurs mis à jour et timer relancé.');
+        await interaction.editReply({ content: '🔄 Compteurs mis à jour et timer relancé.' });
     }
 });
 
